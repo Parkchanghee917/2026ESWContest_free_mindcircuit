@@ -80,6 +80,7 @@ void loop() {
 
   if (HC06.available()) {
     String btSignal = HC06.readStringUntil('\n');
+    btSignal.trim();
 
     if (btSignal.length() > 0) {
       if (btSignal == "20715") {
