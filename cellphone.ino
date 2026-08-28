@@ -13,7 +13,6 @@ SoftwareSerial HC06(A1, A2); // A1: RX, A2: TX
 #define BUTTON1 2
 #define BUTTON2 7
 
-// 단일 문자('0') 대신 String 사용
 String first = "";
 String second = "";
 int targetLED = 0; 
