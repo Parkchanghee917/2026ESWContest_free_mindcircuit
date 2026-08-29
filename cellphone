@@ -1,0 +1,146 @@
+#include <SPI.h>
+#include <SD.h>
+#include <SoftwareSerial.h>
+
+const int chipSelect = 4;    // SD카드 CS 핀 번호
+SoftwareSerial HC06(A1, A2); // A1: RX, A2: TX
+
+//LED 핀 정의
+#define LED1_R 3
+#define LED1_G 5
+#define LED2_R 6
+#define LED2_G 9
+
+//버튼 핀 정의
+#define BUTTON1 2
+#define BUTTON2 7
+
+// SD카드 "setup.txt" 파일의 첫 번째, 두 번째 줄 데이터를 저장할 변수
+String first = "";
+String second = "";
+int targetLED = 0;  // 현재 신호를 받은 대상 LED 지정 (1: LED1, 2: LED2)
+
+// LED 상태 관리 변수 (0: 꺼짐, 1: 빨간색, 2: 깜빡임, 3: 초록색)
+int led1State = 0; 
+int led2State = 0;
+
+unsigned long previousMillis = 0;
+const long interval = 300;
+bool blinkState = false;
+bool sdCardConnected = false;
+
+void setup() {
+  Serial.begin(9600); // 시리얼 모니터 통신 시작
+  HC06.begin(9600);   // 블루투스 통신 시작
+  
+  // LED 핀 출력 모드 설정
+  pinMode(LED1_R, OUTPUT);
+  pinMode(LED1_G, OUTPUT);
+  pinMode(LED2_R, OUTPUT);
+  pinMode(LED2_G, OUTPUT);
+  
+  // 버튼 핀 내부 풀업 저항 설정 (눌리지 않음: HIGH, 눌림: LOW)
+  pinMode(BUTTON1, INPUT_PULLUP);
+  pinMode(BUTTON2, INPUT_PULLUP);
+
+  // 모든 LED 꺼짐 상태로 시작
+  analogWrite(LED1_R, 0); analogWrite(LED1_G, 0);
+  analogWrite(LED2_R, 0); analogWrite(LED2_G, 0);
+}
+
+void loop() {
+  // SD 카드 감지 및 데이터 로드 처리 
+  if (!sdCardConnected) {
+    if (SD.begin(chipSelect)) {
+      sdCardConnected = true;  // SD카드 연결 성공 시
+      led1State = 1;
+      led2State = 1;           // LED 빨간색으로 변경 
+
+      File myFile = SD.open("setup.txt");
+      if (myFile) {
+        int lineCount = 1;
+        while (myFile.available()) {
+          String line = myFile.readStringUntil('\n');
+          line.trim(); 
+          
+          if (line.length() > 0) {
+            if (lineCount == 1) first = line;       // 1번째 줄 저장
+            else if (lineCount == 2) second = line; // 2번째 줄 저장
+            lineCount++;
+          }
+        }
+        myFile.close();
+      }
+      // SD카드 미연결 시 상태 초기화 후 루프 탈출
+    } else {
+      led1State = 0; led2State = 0; targetLED = 0;
+      return; 
+    }
+  } else {
+    // SD카드 제거 또는 파일 감지 체크
+    if (!SD.exists("setup.txt")) { 
+      sdCardConnected = false;
+      first = ""; second = "";
+      led1State = 0; led2State = 0; targetLED = 0;
+      SD.end();   // SD카드 세션 종료
+      return;
+    }
+  }
+
+  // 블루투스(HC-06) 신호 수신 처리
+  if (HC06.available()) {
+    String btSignal = HC06.readStringUntil('\n');
+    btSignal.trim();
+
+    if (btSignal.length() > 0) {
+      // setup.txt 내용과 일치하는 LED를 깜빡임 상태(2)로 변경
+      if (btSignal == "20715") {
+        if (first == "20715") { led1State = 2; targetLED = 1; }
+        else if (second == "20715") { led2State = 2; targetLED = 2; }
+      } 
+      // setup.txt 내용과 일치하는 LED를 깜빡임 상태(2)로 변경
+      else if (btSignal == "20923") {
+        if (first == "20923") { led1State = 2; targetLED = 1; }
+        else if (second == "20923") { led2State = 2; targetLED = 2; }
+      }
+    }
+  }
+
+  unsigned long currentMillis = millis();
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+    blinkState = !blinkState;
+  }
+
+  // 버튼 입력 감지 (INPUT_PULLUP 모드이므로 LOW일 때 true)
+  bool btn1Pressed = !digitalRead(BUTTON1);
+  bool btn2Pressed = !digitalRead(BUTTON2);
+
+  // 1번 버튼 제어
+  if (btn1Pressed && (led1State == 1 || led1State == 2)) {
+    led1State = 3; // 제출된 동안 초록색으로 변경
+  } else if (!btn1Pressed && led1State == 3) {
+    led1State = 1;  // 빼면 다시 빨간색으로 변경
+    targetLED = 0;
+  }
+
+  // 2번 버튼 제어
+  if (btn2Pressed && (led2State == 1 || led2State == 2)) {
+    led2State = 3; // 제출된 동안 초록색으로 변경
+  } else if (!btn2Pressed && led2State == 3) {
+    led2State = 1;  // 빼면 다시 빨간색으로 변경
+    targetLED = 0; 
+  }
+
+   // LED1 핀 출력 적용
+  if (led1State == 1) { analogWrite(LED1_R, 254); analogWrite(LED1_G, 0); }  // 빨간색
+  else if (led1State == 2) { analogWrite(LED1_R, blinkState ? 254 : 0); analogWrite(LED1_G, 0); } // 빨간색 깜빡임
+  else if (led1State == 3) { analogWrite(LED1_R, 0); analogWrite(LED1_G, 254); } // 초록색
+  else { analogWrite(LED1_R, 0); analogWrite(LED1_G, 0); } // 꺼짐
+
+  // LED2 핀 출력 적용
+  if (led2State == 1) { analogWrite(LED2_R, 254); analogWrite(LED2_G, 0); } // 빨간색
+  else if (led2State == 2) { analogWrite(LED2_R, blinkState ? 254 : 0); analogWrite(LED2_G, 0); } // 빨간색 깜빡임
+  else if (led2State == 3) { analogWrite(LED2_R, 0); analogWrite(LED2_G, 254); } // 초록색
+  else { analogWrite(LED2_R, 0); analogWrite(LED2_G, 0); } // 꺼짐
+}
