@@ -92,17 +92,10 @@ void loop() {
     String btSignal = HC06.readStringUntil('\n');
     btSignal.trim();
 
-    if (btSignal.length() > 0) {
+   if (btSignal.length() > 0) {
       // setup.txt 내용과 일치하는 LED를 깜빡임 상태(2)로 변경
-      if (btSignal == "20715") {
         if (first == btSignal) { led1State = 2; targetLED = 1; }
         else if (second == btSignal) { led2State = 2; targetLED = 2; }
-      } 
-      // setup.txt 내용과 일치하는 LED를 깜빡임 상태(2)로 변경
-      else if (btSignal == "20923") {
-        if (first == btSignal) { led1State = 2; targetLED = 1; }
-        else if (second == btSignal) { led2State = 2; targetLED = 2; }
-      }
     }
   }
 
