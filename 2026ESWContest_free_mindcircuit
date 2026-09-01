@@ -1,6 +1,6 @@
 #include <SPI.h>
 #include <SD.h>
-#include <SoftwareSerial.h>
+#include <SoftwareSerial.h> 
 
 const int chipSelect = 4;    // SD카드 CS 핀 번호
 SoftwareSerial HC06(A1, A2); // A1: RX, A2: TX
